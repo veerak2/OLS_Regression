@@ -1,0 +1,164 @@
+---
+title: "Assignment 1"
+author: "Kavin"
+date: "2/17/2021"
+output: html_document
+---
+
+
+### Importing necessary libraries
+```{r}
+library(knitr)
+library(PerformanceAnalytics)
+library(ggplot2)
+library(stargazer)
+```
+
+Reading the dataset to be analyzed
+
+```{r}
+setwd("C:/College/Courses/SDM/")
+d <- read.csv('CreditRating.csv')
+```
+
+
+```{r}
+kable(d[1:10,], caption = "Credit Ratings")
+```
+
+
+Dropping the column ID
+```{r}
+d <- d[,-1]
+```
+
+Data Transformation - Computing Credit utilization.
+```{r}
+d$CreditUtilization <- with(d, Balance/Limit) 
+```
+
+
+Checking for null values
+```{r}
+colSums((is.na(d)))
+```
+
+
+### EDA
+```{r cars}
+summary(d)
+```
+### Visualizations
+
+
+```{r, echo = FALSE}
+ggplot(d, aes(Balance)) +
+  geom_histogram(color="black", fill="white") 
+```
+
+The dependant variable is not uniformly distributed.
+
+Using performance analytics to visualize the data
+```{r pressure, echo=FALSE}
+nums <- unlist(lapply(d, is.numeric))
+chart.Correlation(d[,nums])
+
+```
+
+We should drop Limit from our model because credit limits are not a cause for credit ratings.
+
+Correlations:
+
+Rating and Balance - 0.86
+Rating and Income - 0.79
+Rating and Credit Utilization - 0.62
+Income and Balance - 0.46
+
+
+
+#### Doing interaction plots to understand the relationship between our categorical variables and numerical variables:
+
+##### Does ethnicity have an effect on credit ratings based on the given data?
+```{r,echo=FALSE}
+ggplot() +
+  aes(x = log(d$Income), y = d$Rating, color = d$Ethnicity) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) + xlab('log(Income)') + ylab('Ratings') + labs(color = "Ethnicity")
+```
+
+For lower income, there seems to be some bias against African Americans when comes to lower levels of come. However, as the income increases, the data suggests the opposite. There are low data points for higher income so we cannot infer from the sample data.
+
+
+Does gender have an effect on credit ratings based on the given data?
+```{r,echo=FALSE}
+ggplot() +
+  aes(x = log(d$Income), y = d$Rating, color = d$Gender) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) + xlab('Log(Income)') + ylab('Ratings') + labs(color = "Gender")
+```
+
+The lines are almost parallel, this suggests that there is no effect.
+
+Does being married have an effect on credit ratings based on the given data?
+```{r,echo=FALSE}
+ggplot() +
+  aes(x = log(d$Income), y = d$Rating, color = d$Married) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) + xlab('Log(Income)') + ylab('Ratings') + labs(color = "Married")
+```
+
+The lines are almost parallel, this suggests that there is no effect.
+
+Do students have higher credit balance ?
+```{r,echo=FALSE}
+ggplot() +
+  aes(x = d$Income, y = log(d$Balance), color = d$Student) +
+  geom_point() + geom_smooth(method = "lm", se = FALSE) 
+```
+
+We do not have enough data on students. 
+
+Does education years has a positive linear relationship with income?
+```{r,echo=FALSE}
+ggplot() +
+  aes(x = d$Education, y =d$Income) + geom_bar(stat = "identity",) +
+  xlab("Education") + ylab("Income")
+
+```
+
+### Models 
+Simple regression model
+
+```{r}
+m1 <- lm(Rating ~ Income + Age + Balance + Cards + Ethnicity + Gender + Education + Student , data=d) 
+summary(m1)       
+plot(m1)
+```
+
+Inferences: 
+- The DV's explain 97% of the variability. But the model fails the OLS assumptions test, as we can see from the QQ plot and Residuals va fitted plot. Therefore this model is biased.
+- For the given data, P values for the remaining variables are high so we cannot reject the null hypothesis
+
+```{r}
+m2 <- lm(Rating ~ Age  + Cards + Ethnicity + Gender + Education + Student , data=d) 
+summary(m2)       
+plot(m2)
+```
+- On removing income, balance and credit utilization, we can see that these removed variables explain 99% of the variability. 
+
+Trying With interaction effects
+
+```{r}
+m3 <- lm(Rating ~  Income + Age + Balance + Cards + Education + Ethnicity + Gender + Student + CreditUtilization + Income*Ethnicity + Income*Gender + Income*Education, data=d) 
+summary(m3)       
+plot(m3)
+```
+- None of the interaction effects are significant
+```{r}
+m4 <- lm(Rating ~  Income + Age + Balance + Cards + Education + Ethnicity + Gender + Student + CreditUtilization, data=d) 
+summary(m4)       
+plot(m4)
+```
+
+
+```{r}
+stargazer(m3,m4, title="Results", type = "text")
+```
+
